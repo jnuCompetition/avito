@@ -83,28 +83,24 @@ def get_geo_feature(df):
     df.drop(['city_region'],axis=1,inplace=True)
     return df
 
-def tfidf_feat(train,test,features,n_components):
+def tfidf_feat(train,test,features,n_components,alg='pca'):
 
     print(features,n_components)
+
+
     pool = mlp.Pool(len(features))
     results = []
     for feat,k in zip(features,n_components):
-        result = pool.apply_async(tfidf_worker,
-                                  args=(feat,k,train[feat],test[feat]))
-        results.append((feat,k,result))
-    pool.close()
-    pool.join()
+        # result = pool.apply_async(tfidf_worker,
+        #                           args=(feat,k,train[feat],test[feat],alg))
+        # results.append((feat,k,result))
+        tfidf_worker(feat,k,train[feat],test[feat],alg)
+    # pool.close()
+    # pool.join()
+    #
+    # for feat,k,result in tqdm(results):
+    #     result.get()
 
-    for feat,k,result in tqdm(results):
-        result.get()
-        # de_matrix = np.load('./dataset/'+feat+'.npy')
-        # cols = [feat[:4] + "_tf_" + str(x) for x in range(k)]
-        #
-        # for i, col in enumerate(cols):
-        #     train[col] = de_matrix[:len(train),i]
-        #     test[col] = de_matrix[len(train):,i]
-
-    # return train,test
 
 def agg_time_feat(train,test):
     used_cols = ['item_id', 'user_id']
@@ -544,21 +540,26 @@ def oof_feature(train,test,alpha):
 def pipeline():
 
 
-    train = pd.read_csv("./dataset/train.csv",parse_dates=["activation_date"])
-    test = pd.read_csv("./dataset/test.csv",parse_dates=["activation_date"])
-
+    # train = pd.read_csv("./dataset/train.csv",parse_dates=["activation_date"])
+    # test = pd.read_csv("./dataset/test.csv",parse_dates=["activation_date"])
+    train = pd.read_csv("./dataset/train.csv",usecols=['description','title'])
+    test = pd.read_csv("./dataset/test.csv",usecols=['description','title'])
     # train,test = baseFeature(train),baseFeature(test)
     # train,test = get_geo_feature(train),get_geo_feature(test)
 
     print('tfidf')
-    tfidf_feat(train,test,['description','title'],[800,500])
+    # tfidf_feat(train, test, ['description','title'],[1000,500],alg='ica')
+    tfidf_feat(train,test,['description','title'],[1000,500])
 
 
     # train, test = agg_time_feat(train, test)
 
     # train,test = num_to_bin_feature(train,test)
     # train,test = target_encode(train,test)
-
+    # get_img_info(train, 'tr')
+    # get_img_info(test, 'te')
+    # get_img_confi(train,'tr')
+    # get_img_confi(test,'te')
 
     # train, test = oof_feature(train, test,20)
 

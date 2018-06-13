@@ -1,7 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
-from itertools import combinations,product
-from tool import co_prob,condition_prob
+import multiprocessing as mlp
+from tool import co_prob,condition_prob,norm_text
 import gc
 import numpy as np
 
@@ -89,35 +89,64 @@ def conti_stat_feature_worker(usecols,features):
     return train[cols],test[cols]
 
 
-def tfidf_worker(feat,k,train_text,test_text):
-    from sklearn.decomposition import KernelPCA, PCA, TruncatedSVD
+def tfidf_worker(feat,k,train_text,test_text,alg='pca'):
+    from sklearn.decomposition import KernelPCA, PCA, TruncatedSVD,FastICA
     from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
     from nltk.corpus import stopwords
 
+    def clean(sentences):
+        num_cpu = mlp.cpu_count()
+        pool = mlp.Pool(num_cpu)
+        num_task = 1 + len(sentences) // num_cpu
+        results = []
+
+        for i in range(num_cpu):
+            result = pool.apply_async(norm_text,args=(sentences[i*num_task:(i+1)*num_task],))
+            results.append(result)
+        pool.close()
+        pool.join()
+
+        clean_sent = []
+        for result in tqdm(results):
+            clean_sent += result.get()
+        return clean_sent
+
     def pca_compression(tfidf_matrix, n_components):
-        model = TruncatedSVD(n_components=n_components,algorithm='arpack',n_iter=20)
+        if alg == 'pca':
+            model = TruncatedSVD(n_components=n_components,algorithm='arpack',n_iter=100)
+        else:
+            model = FastICA(n_components=n_components)
+
         de_matrix = model.fit_transform(tfidf_matrix)
 
-        total_ratio = []
-        ratio = 0
-        for i in model.explained_variance_ratio_:
-            ratio+=i
-            total_ratio.append(ratio)
-        print(total_ratio)
+        if alg == 'pca':
+            total_ratio = []
+            ratio = 0
+            for i in model.explained_variance_ratio_:
+                ratio+=i
+                total_ratio.append(ratio)
+            print(total_ratio)
         print(feat)
         return de_matrix
 
     text = train_text.fillna('_unk_').values.tolist() + \
            test_text.fillna('_unk_').values.tolist()
+    text = clean(text)
 
-    tfv = TfidfVectorizer(max_features=15000,strip_accents='unicode', analyzer='char',
+    if feat == 'title':
+        model = CountVectorizer(ngram_range=(1, 2),analyzer='word',max_features=8000,
+                                stop_words = set(stopwords.words('russian')))
+    else:
+        model = TfidfVectorizer(max_features=15000,strip_accents='unicode', analyzer='word',
                           min_df=15,stop_words=set(stopwords.words('russian')),max_df = 0.4,
-                          ngram_range=(1,2),use_idf=1, smooth_idf=False, sublinear_tf=True)
-    tfidf_feat = tfv.fit_transform(text)
+                          ngram_range=(1,2),smooth_idf=False, sublinear_tf=True)
 
+    tfidf_feat = model.fit_transform(text)
+    tfidf_feat = tfidf_feat.asfptype()
+    assert tfidf_feat is not None
     # 获取pca后的np
     de_matrix = pca_compression(tfidf_feat, n_components=k)
-    np.save('./dataset/'+feat+'.npy',de_matrix)
+    np.save('./dataset/'+alg+feat+'_word.npy',de_matrix)
 
     return True
 

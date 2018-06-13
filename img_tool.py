@@ -8,14 +8,8 @@ import operator
 import cv2
 import os
 from keras.preprocessing import image
-
-images_path = './dataset/sample_avito_images/'
-imgs = os.listdir(images_path)
-features = pd.DataFrame()
-features['image'] = imgs
-
-
-
+from tqdm import tqdm
+from glob import glob
 
 def perform_color_analysis(img, flag):
     def color_analysis(img):
@@ -92,7 +86,6 @@ def get_average_color(img):
     average_color = [img[:, :, i].mean() for i in range(img.shape[-1])]
     return average_color
 
-
 def getSize(filename):
     st = os.stat(filename)
     return st.st_size
@@ -116,3 +109,31 @@ def image_classify(model, pak, img_f):
     x = pak.preprocess_input(x)
     preds = model.predict(x)
     return pak.decode_predictions(preds, top=3)[0]
+
+
+def img_resize():
+    from config import img_path,img_size
+    files = glob('./dataset/train_img/*.jpg') + glob('./dataset/test_img/*.jpg')
+    for f in tqdm(files):
+        img = cv2.imread(f)
+        cv2.imwrite(img_path+f,cv2.resize(img,(img_size,)*2))
+
+
+if __name__ == '__main__':
+    img_resize()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

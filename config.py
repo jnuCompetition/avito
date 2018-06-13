@@ -11,90 +11,66 @@ USE_FEAT = [
 ]
 
 
-
-
-
+img_path = './dataset/img/'
+img_size = 64
+title_len = 7
+desc_len = 45
 
 
 """
-[50]	valid_0's rmse: 0.232616
-[100]	valid_0's rmse: 0.225339
-[150]	valid_0's rmse: 0.222776
-[200]	valid_0's rmse: 0.221581
-[250]	valid_0's rmse: 0.220932
-[300]	valid_0's rmse: 0.220469
-[350]	valid_0's rmse: 0.220071
-[400]	valid_0's rmse: 0.219757
-[450]	valid_0's rmse: 0.219529
-[500]	valid_0's rmse: 0.219325
-[550]	valid_0's rmse: 0.219159
-[600]	valid_0's rmse: 0.219054
-[650]	valid_0's rmse: 0.218938
-[700]	valid_0's rmse: 0.218831
-[750]	valid_0's rmse: 0.218743
-[800]	valid_0's rmse: 0.218674
-[850]	valid_0's rmse: 0.218611
-[900]	valid_0's rmse: 0.218534
-[950]	valid_0's rmse: 0.218471
-[1000]	valid_0's rmse: 0.218426
-[1050]	valid_0's rmse: 0.218391
-[1100]	valid_0's rmse: 0.218342
-[1150]	valid_0's rmse: 0.218308
-[1200]	valid_0's rmse: 0.218278
-[1250]	valid_0's rmse: 0.218234
-[1300]	valid_0's rmse: 0.218198
-[1350]	valid_0's rmse: 0.218178
-[1400]	valid_0's rmse: 0.218141
-[1450]	valid_0's rmse: 0.218118
-[1500]	valid_0's rmse: 0.21809
-[1550]	valid_0's rmse: 0.218069
-[1600]	valid_0's rmse: 0.218054
-[1650]	valid_0's rmse: 0.218042
-[1700]	valid_0's rmse: 0.218012
-[1750]	valid_0's rmse: 0.218003
-[1800]	valid_0's rmse: 0.217986
-[1850]	valid_0's rmse: 0.217963
-[1900]	valid_0's rmse: 0.217956
-[1950]	valid_0's rmse: 0.217938
-[2000]	valid_0's rmse: 0.217931
-[2050]	valid_0's rmse: 0.217917
-[2100]	valid_0's rmse: 0.217908
-[2150]	valid_0's rmse: 0.217907
-[2200]	valid_0's rmse: 0.217903
-[2250]	valid_0's rmse: 0.21789
-[2300]	valid_0's rmse: 0.217882
-[2350]	valid_0's rmse: 0.217874
-[2400]	valid_0's rmse: 0.217868
-[2450]	valid_0's rmse: 0.217864
-[2500]	valid_0's rmse: 0.217857
-[2550]	valid_0's rmse: 0.217858
-[2600]	valid_0's rmse: 0.21785
-[2650]	valid_0's rmse: 0.217842
-[2700]	valid_0's rmse: 0.21784
-[2750]	valid_0's rmse: 0.217836
-[2800]	valid_0's rmse: 0.217832
-[2850]	valid_0's rmse: 0.217829
-[2900]	valid_0's rmse: 0.217826
-[2950]	valid_0's rmse: 0.217823
-[3000]	valid_0's rmse: 0.217819
-[3050]	valid_0's rmse: 0.217821
-Early stopping, best iteration is:
-[2992]	valid_0's rmse: 0.217819
+region                       28
+city                       1752
+parent_category_name          9
+category_name                47
+param_1                     371
+param_2                     277
+param_3                    1276
+title                   1022203
+description             1793972
+activation_date              30
+user_type                     3
+image                   1856665
+image_top_1                3063
+param_combined             2402
+
+region                       28
+city                       1752
+parent_category_name          9
+category_name                47
+param_1                     372
+param_2                     278
+param_3                    1277
+title                   1022203
+description             1793973
+activation_date              30
+user_type                     3
+image                   1856666
+image_top_1                3064
+param_combined             2402
 
 
-[50]	valid_0's rmse: 0.232186
-[100]	valid_0's rmse: 0.22479
-[150]	valid_0's rmse: 0.222202
-[200]	valid_0's rmse: 0.22101
-[250]	valid_0's rmse: 0.220386
-[300]	valid_0's rmse: 0.219906
-[350]	valid_0's rmse: 0.219532
-[400]	valid_0's rmse: 0.219263
-[450]	valid_0's rmse: 0.219032
-[500]	valid_0's rmse: 0.218836
-[550]	valid_0's rmse: 0.218684
-[600]	valid_0's rmse: 0.218569
-[650]	valid_0's rmse: 0.218466
-[700]	valid_0's rmse: 0.218388
-[750]	valid_0's rmse: 0.218292
+num leaves      lr        bin       bag frac       feat frac
+800            0.017      255       0.9            0.4
+1000           0.017      255       0.8            0.4
+750            0.02       50        0.9            0.4
+750            0.017      255       0.9            0.75
+
+
 """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
