@@ -111,17 +111,68 @@ def image_classify(model, pak, img_f):
     return pak.decode_predictions(preds, top=3)[0]
 
 
-def img_resize():
+def img_resize(multi_process):
     from config import img_path,img_size
-    files = glob('./dataset/train_img/*.jpg') + glob('./dataset/test_img/*.jpg')
-    for f in tqdm(files):
-        img = cv2.imread(f)
-        cv2.imwrite(img_path+f,cv2.resize(img,(img_size,)*2))
+    files = glob('./dataset/tr_img/*.jpg') + glob('./dataset/te_img/*.jpg')
+    print(len(files))
+    if multi_process:
+        from process_worker import img_resize_worker
+        import multiprocessing as mlp
 
+        num_cpu = mlp.cpu_count()//2
+        pool = mlp.Pool(num_cpu)
+        num_task = 1 + len(files) // num_cpu
+        results = []
+
+        for i in range(num_cpu):
+            result = pool.apply_async(img_resize_worker,
+                                      args=(files[i * num_task:(i + 1) * num_task],))
+            results.append(result)
+        pool.close()
+        pool.join()
+        for i in results:
+            i.get()
+    else:
+        for f in tqdm(files):
+            img = cv2.imread(f)
+            cv2.imwrite(img_path + f[17:], cv2.resize(img, (img_size,) * 2))
+
+def pack_imgs():
+    from config import img_path
+    train = pd.read_csv("./dataset/train.csv", usecols=['image'])
+    test = pd.read_csv("./dataset/test.csv", usecols = ['image'])
+    all_samples = train.append(test).reset_index(drop=True)
+    all_samples['image'].fillna('unk', inplace=True)
+    all_samples['image'] = img_path + all_samples['image'] + '.jpg'
+
+
+    import multiprocessing as mlp
+    from process_worker import read_img
+
+    # imgs =read_img(all_samples['image'].values)
+    num_cpu = mlp.cpu_count()
+    pool = mlp.Pool(num_cpu)
+    num_task = 1 + len(all_samples) // num_cpu
+    results = []
+    for i in range(num_cpu):
+        result = pool.apply_async(read_img,
+                args=(all_samples['image'].values[i * num_task:(i + 1) * num_task],))
+        results.append(result)
+    pool.close()
+    pool.join()
+    imgs = []
+    for i in results:
+        imgs+=i.get()
+
+    print('save')
+    imgs = np.array(imgs)
+    print(imgs.shape)
+    print(imgs[0].shape)
+    np.save('./dataset/packimg.npy',imgs)
 
 if __name__ == '__main__':
-    img_resize()
-
+    # img_resize(True)
+    pack_imgs()
 
 
 

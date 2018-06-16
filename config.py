@@ -51,10 +51,19 @@ param_combined             2402
 
 num leaves      lr        bin       bag frac       feat frac
 800            0.017      255       0.9            0.4
+800            0.018      255       0.9            0.4
 1000           0.017      255       0.8            0.4
 750            0.02       50        0.9            0.4
 750            0.017      255       0.9            0.75
 
+[50]    valid_0's rmse: 0.231045
+[100]   valid_0's rmse: 0.22343
+[150]   valid_0's rmse: 0.22094
+[200]   valid_0's rmse: 0.219826
+[250]   valid_0's rmse: 0.219175
+[300]   valid_0's rmse: 0.21876
+[350]   valid_0's rmse: 0.218399
+[400]   valid_0's rmse: 0.218144
 
 """
 

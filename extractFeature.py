@@ -83,7 +83,7 @@ def get_geo_feature(df):
     df.drop(['city_region'],axis=1,inplace=True)
     return df
 
-def tfidf_feat(train,test,features,n_components,alg='pca'):
+def tfidf_feat(train,test,features,n_components,alg='pca',sparse=False):
 
     print(features,n_components)
 
@@ -91,16 +91,15 @@ def tfidf_feat(train,test,features,n_components,alg='pca'):
     pool = mlp.Pool(len(features))
     results = []
     for feat,k in zip(features,n_components):
-        # result = pool.apply_async(tfidf_worker,
-        #                           args=(feat,k,train[feat],test[feat],alg))
-        # results.append((feat,k,result))
-        tfidf_worker(feat,k,train[feat],test[feat],alg)
-    # pool.close()
-    # pool.join()
-    #
-    # for feat,k,result in tqdm(results):
-    #     result.get()
+        result = pool.apply_async(tfidf_worker,
+                                  args=(feat,k,train[feat],test[feat],alg,sparse))
+        results.append((feat,k,result))
+        # tfidf_worker(feat,k,train[feat],test[feat],alg)
+    pool.close()
+    pool.join()
 
+    for feat,k,result in tqdm(results):
+        result.get()
 
 def agg_time_feat(train,test):
     used_cols = ['item_id', 'user_id']
@@ -536,6 +535,18 @@ def oof_feature(train,test,alpha):
 
     return train,test
 
+def img_feat():
+    from keras.applications.vgg16 import VGG16
+    from keras.models import Model
+
+    x = VGG16(weights='imagenet',include_top=False).output
+    x = GlobalAveragePooling2D()(x)
+    # let's add a fully-connected layer
+    x = Dense(1024, activation='relu')(x)
+    # and a logistic layer -- let's say we have 200 classes
+    predictions = Dense(200, activation='softmax')(x)
+    model = Model(inputs=model.input, outputs=model.output)
+
 
 def pipeline():
 
@@ -549,7 +560,7 @@ def pipeline():
 
     print('tfidf')
     # tfidf_feat(train, test, ['description','title'],[1000,500],alg='ica')
-    tfidf_feat(train,test,['description','title'],[1000,500])
+    tfidf_feat(train,test,['description','title'],[1000,500],sparse=True)
 
 
     # train, test = agg_time_feat(train, test)

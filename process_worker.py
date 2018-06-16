@@ -89,27 +89,28 @@ def conti_stat_feature_worker(usecols,features):
     return train[cols],test[cols]
 
 
-def tfidf_worker(feat,k,train_text,test_text,alg='pca'):
+def tfidf_worker(feat,k,train_text,test_text,alg='pca',sparse=False):
     from sklearn.decomposition import KernelPCA, PCA, TruncatedSVD,FastICA
     from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
     from nltk.corpus import stopwords
+    from nltk.tokenize.toktok import ToktokTokenizer
 
-    def clean(sentences):
-        num_cpu = mlp.cpu_count()
-        pool = mlp.Pool(num_cpu)
-        num_task = 1 + len(sentences) // num_cpu
-        results = []
-
-        for i in range(num_cpu):
-            result = pool.apply_async(norm_text,args=(sentences[i*num_task:(i+1)*num_task],))
-            results.append(result)
-        pool.close()
-        pool.join()
-
-        clean_sent = []
-        for result in tqdm(results):
-            clean_sent += result.get()
-        return clean_sent
+    # def clean(sentences):
+    #     num_cpu = mlp.cpu_count()
+    #     pool = mlp.Pool(num_cpu)
+    #     num_task = 1 + len(sentences) // num_cpu
+    #     results = []
+    #
+    #     for i in range(num_cpu):
+    #         result = pool.apply_async(norm_text,args=(sentences[i*num_task:(i+1)*num_task],))
+    #         results.append(result)
+    #     pool.close()
+    #     pool.join()
+    #
+    #     clean_sent = []
+    #     for result in tqdm(results):
+    #         clean_sent += result.get()
+    #     return clean_sent
 
     def pca_compression(tfidf_matrix, n_components):
         if alg == 'pca':
@@ -131,24 +132,26 @@ def tfidf_worker(feat,k,train_text,test_text,alg='pca'):
 
     text = train_text.fillna('_unk_').values.tolist() + \
            test_text.fillna('_unk_').values.tolist()
-    text = clean(text)
+    text = norm_text(text)
 
     if feat == 'title':
-        model = CountVectorizer(ngram_range=(1, 2),analyzer='word',max_features=8000,
-                                stop_words = set(stopwords.words('russian')))
+        model = CountVectorizer(ngram_range=(1, 2),analyzer=ToktokTokenizer().tokenize,max_features=8000,
+                                stop_words = set(stopwords.words('russian')),)
     else:
-        model = TfidfVectorizer(max_features=15000,strip_accents='unicode', analyzer='word',
+        model = TfidfVectorizer(max_features=15000,strip_accents='unicode', analyzer=ToktokTokenizer().tokenize,
                           min_df=15,stop_words=set(stopwords.words('russian')),max_df = 0.4,
                           ngram_range=(1,2),smooth_idf=False, sublinear_tf=True)
-
     tfidf_feat = model.fit_transform(text)
     tfidf_feat = tfidf_feat.asfptype()
-    assert tfidf_feat is not None
-    # 获取pca后的np
-    de_matrix = pca_compression(tfidf_feat, n_components=k)
-    np.save('./dataset/'+alg+feat+'_word.npy',de_matrix)
+    if sparse:
+        from scipy.sparse import save_npz
+        save_npz('./dataset/sparse'+feat+'.npz',tfidf_feat)
+    else:
+        # 获取pca后的np
+        de_matrix = pca_compression(tfidf_feat, n_components=k)
+        np.save('./dataset/'+alg+feat+'_word.npy',de_matrix)
 
-    return True
+
 
 def img_info_worker(img_files,path):
     from img_tool import  perform_color_analysis,average_pixel_width,get_average_color,get_dominant_color,get_blurrness_score
@@ -197,8 +200,19 @@ def img_confi_worker(img_files,model,path):
 
     return img_confi
 
+def img_resize_worker(files):
+    import cv2
+    from config import img_path,img_size
+    for f in tqdm(files):
+        img = cv2.imread(f)
+        cv2.imwrite(img_path+f[17:],cv2.resize(img,(img_size,)*2))
 
-
+def read_img(files):
+    import cv2
+    imgs = []
+    for f in tqdm(files):
+        imgs.append(cv2.imread(f))
+    return imgs
 
 
 

@@ -4,6 +4,13 @@ from text_embedding import pocess_text
 from config import img_path
 import cv2
 import numpy as np
+import tensorflow as tf
+import keras.backend.tensorflow_backend as KTF
+config = tf.ConfigProto()
+config.gpu_options.allow_growth=True   #不全部占满显存, 按需分配
+session = tf.Session(config=config)
+KTF.set_session(session)
+
 from keras.layers import Embedding,Input,concatenate,Dense,Flatten,CuDNNGRU,Bidirectional
 from keras.layers import Conv2D,GlobalMaxPooling1D,GlobalAveragePooling1D,Activation
 from keras.layers import MaxPool2D,GlobalAveragePooling2D,BatchNormalization,Dropout
@@ -14,19 +21,21 @@ from config import img_size,title_len,desc_len
 from keras import backend as K
 from sklearn.cross_validation import KFold
 
-def get_data():
+def get_data(batch_read):
     from tool import feature_selective
     from sklearn.preprocessing import LabelEncoder
 
     usecols, dtypes = feature_selective()
-    usecols += ['description', 'title','image']
-    dtypes['description'] = 'str'
-    dtypes['title'] = 'str'
-    dtypes['image'] = 'str'
+    usecols += ['description', 'title','image',"user_type"]
+    dtypes['description'] = str
+    dtypes['title'] = str
+    dtypes['image'] = str
+    dtypes["user_type"] = str
     for col in usecols:
-        dtypes[col] = str if dtypes[col] == 'category' else dtypes[col]
-
-
+        if dtypes[col] == 'category':
+            dtypes[col] = str
+        elif dtypes[col] == np.float16:
+            dtypes[col] = np.float64
 
     print('read data ..')
     train = pd.read_csv("./dataset/train.csv", usecols=usecols+['deal_probability'], dtype=dtypes)
@@ -36,28 +45,31 @@ def get_data():
     train.drop(['deal_probability'],axis=1,inplace=True)
 
     num_tr = len(train)
-    del train,test
     all_samples = train.append(test).reset_index(drop=True)
-
+    del train, test
 
     print('prepocess')
     le = LabelEncoder()
     conti = []
     cate = []
     for col in tqdm(usecols):
-        if dtypes[col] not in ['category','str']:
+        if dtypes[col] != str:
             all_samples[col].fillna(all_samples[col].median(),inplace=True)
+            if all_samples[col].std() < 0.1:
+                continue
             all_samples[col] = (all_samples[col] - all_samples[col].mean())/all_samples[col].std()
             conti.append(col)
-        elif dtypes[col] == 'category' and col not in ['description', 'title','image']:
+        elif dtypes[col] == str and col not in ['description', 'title','image']:
             all_samples[col].fillna('unk',inplace=True)
             all_samples[col] = le.fit_transform(all_samples[col].values)
             cate.append(col)
+    print(cate)
+    print(all_samples)
     cate.append('image')
     all_samples['image'].fillna('unk',inplace=True)
     all_samples['image'] = img_path+all_samples['image']+'.jpg'
 
-    desc, desc_embed, title, title_embed = pocess_text(all_samples['description', 'title'])
+    desc, desc_embed, title, title_embed = pocess_text(all_samples[['description', 'title']])
 
     embed = {'desc':desc_embed,'title':title_embed}
     tr = {}
@@ -72,13 +84,34 @@ def get_data():
     tr['title'] = title[:num_tr]
     te['title'] = title[num_tr:]
 
-    print('read image')
-    imgs = []
-    for i in tqdm(all_samples['image'].values):
-        imgs.append(cv2.imread(i))
-    imgs = np.array(imgs)
-    tr['image'] = imgs[:num_tr]
-    te['image'] = imgs[num_tr:]
+    if batch_read:
+        tr['image'] = all_samples['image'].values[:num_tr]
+        te['image'] = all_samples['image'].values[num_tr:]
+    else:
+        print('read image')
+        imgs = []
+        # for i in tqdm(all_samples['image'].values):
+        #     imgs.append(cv2.imread(i))
+        import multiprocessing as mlp
+        from process_worker import read_img
+
+        num_cpu = mlp.cpu_count()
+        pool = mlp.Pool(num_cpu)
+        num_task = 1 + len(all_samples) // num_cpu
+        results = []
+        for i in range(num_cpu):
+            result = pool.apply_async(read_img,
+                    args=(all_samples['image'].values[i * num_task:(i + 1) * num_task],))
+            results.append(result)
+        pool.close()
+        pool.join()
+        for i in results:
+            imgs+=i.get()
+
+        imgs = np.array(imgs)
+        print(imgs.shape)
+        tr['image'] = imgs[:num_tr]
+        te['image'] = imgs[num_tr:]
 
     return tr,Y,te,embed
 
@@ -99,7 +132,7 @@ def get_model(embed,num_conti):
     para1 = Input(shape=[1], name="param_1")
     para2 = Input(shape=[1], name="param_2")
     para3 = Input(shape=[1], name="param_3")
-    act = Input(shape=[1], name="activation_date")
+    # act = Input(shape=[1], name="activation_date")
     ut = Input(shape=[1], name="user_type")
     img_top = Input(shape=[1], name="image_top_1")
 
@@ -125,21 +158,21 @@ def get_model(embed,num_conti):
     param_combined             2402
     """
 
-    emb_region = Embedding(28,(8,))(region)
-    emb_city = Embedding(1752,(16,))(city)
-    emb_pcn = Embedding(9,(3,))(pcn)
-    emb_cn = Embedding(47,(8,))(cn)
-    emb_para1 = Embedding(372,(16,))(para1)
-    emb_para2 = Embedding(278,(16,))(para2)
-    emb_para3 = Embedding(1277,(16,))(para3)
-    emb_act = Embedding(30,(8,))(act)
-    emb_img_top = Embedding(3064,(32,))(img_top)
-    emb_ut = Embedding(3,(3,),weights=[np.eye(3,3)],trainable=False)(ut)
+    emb_region = Embedding(28,8)(region)
+    emb_city = Embedding(1752,16)(city)
+    emb_pcn = Embedding(9,3)(pcn)
+    emb_cn = Embedding(47,8)(cn)
+    emb_para1 = Embedding(372,16)(para1)
+    emb_para2 = Embedding(278,16)(para2)
+    emb_para3 = Embedding(1277,16)(para3)
+    # emb_act = Embedding(30,8)(act)
+    emb_img_top = Embedding(3064,32)(img_top)
+    emb_ut = Embedding(3,3,weights=[np.eye(3,3)],trainable=False)(ut)
 
     num_word = len(embed['title'])
-    emb_title = Embedding(num_word,(title_len,),weights=[embed['title']],trainable=False)(title)
+    emb_title = Embedding(num_word,300,weights=[embed['title']],trainable=False)(title)
     num_word = len(embed['desc'])
-    emb_desc = Embedding(num_word,(desc_len,),weights=[embed['desc']],trainable=False)(desc)
+    emb_desc = Embedding(num_word,300,weights=[embed['desc']],trainable=False)(desc)
 
     conv = block_wrap(img,32)
     conv = MaxPool2D(padding='same')(conv)
@@ -168,7 +201,7 @@ def get_model(embed,num_conti):
         Flatten()(emb_para1),
         Flatten()(emb_para2),
         Flatten()(emb_para3),
-        Flatten()(emb_act),
+        # Flatten()(emb_act),
         Flatten()(emb_img_top),
         Flatten()(emb_ut),
         conti,
@@ -180,7 +213,7 @@ def get_model(embed,num_conti):
     ])
     fc = Dense(256,activation='relu')(fc)
     fc = Dropout(0.5)(fc)
-    fc = Dense(1,activation='sigmoid')(fc)
+    fc = Dense(1,activation='sigmoid',name='output')(fc)
 
 
     model = Model([
@@ -191,7 +224,7 @@ def get_model(embed,num_conti):
         para1,
         para2,
         para3,
-        act,
+        # act,
         ut,
         img_top,
         title,
@@ -203,23 +236,37 @@ def get_model(embed,num_conti):
 
     return model
 
+def generator(tr,y,batchsize):
+    idx = list(range(len(y)))
+    while 1:
+        np.random.shuffle(idx)
+        pos = 0
+        while(pos < len(y)):
+            data = {}
+            for key,item in tr.items():
+                data[key] = item[idx[pos:pos+batchsize]]
+            imgs = []
+            for f in data['image']:
+                imgs.append(cv2.imread(f))
+            data['image'] = np.array(imgs)
+            yield (data, {'output':y[pos:pos+batchsize]})
+
 def split_data(data,idx):
     result = {}
     for key,item in data.items():
         result[key] = item[idx]
     return result
 
-def main(batchsize,n_folds):
+def main(batchsize,n_folds,batch_read):
 
-    tr, Y, te, embed = get_data()
-
+    tr, Y, te, embed = get_data(batch_read)
     num_conti = len(tr['conti'][0])
 
     model = get_model(embed,num_conti)
 
     del embed
 
-    kf = KFold(len(Y), n_folds=K, shuffle=True, random_state=42)
+    kf = KFold(len(Y), n_folds=n_folds, shuffle=True, random_state=42)
 
     results = np.zeros((len(te['conti'], )))
 
@@ -231,8 +278,11 @@ def main(batchsize,n_folds):
 
         val_X = split_data(tr,val_idx)
         val_Y = Y[val_idx]
-
-        model.fit(tr_X,tr_Y,batchsize,epochs=20,callbacks=EarlyStopping(patience=1),validation_data=(val_X,val_Y))
+        if batch_read:
+            model.fit_generator(generator(tr_X,tr_Y,batchsize),20,epochs=100,callbacks=[EarlyStopping(patience=1)],
+                                validation_data=generator(val_X,val_Y,len(val_Y)),validation_steps=1,workers=1,)
+        else:
+            model.fit(tr_X,tr_Y,batchsize,epochs=20,callbacks=[EarlyStopping(patience=1)],validation_data=(val_X,val_Y))
 
         test_pred = model.predict(te)
 
@@ -245,7 +295,7 @@ def main(batchsize,n_folds):
 
 if __name__ == '__main__':
 
-    main(6400,5)
+    main(6400,5,True)
 
 
 

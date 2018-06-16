@@ -188,21 +188,22 @@ def norm_text(sentences):
         s = match.string[match.start():match.end()]
         return s.replace('.', '')
 
-    shortenings = [u'мм', u'см', u'м', u'км', u'мл', u'л', u'г', u'кг', u'т', u'лит',
-                   u'р', u'руб', u'сот', u'га', u'шт', u'ш', u'дб', u'вт',
-                   u'ул', u'пр', u'д', u'кв', u'чел', u'жен', u'муж', u'тыс',
-                   u'др']
-    shortenings = '|'.join(shortenings)
+    # shortenings = [u'мм', u'см', u'м', u'км', u'мл', u'л', u'г', u'кг', u'т', u'лит',
+    #                u'р', u'руб', u'сот', u'га', u'шт', u'ш', u'дб', u'вт',
+    #                u'ул', u'пр', u'д', u'кв', u'чел', u'жен', u'муж', u'тыс',
+    #                u'др']
+    # shortenings = '|'.join(shortenings)
 
     def normalize(text):
-        text = text.lower().replace(u'ё', u'е')
-        text = text.replace(u'²', '2')
-        text = re.sub('(\d+)[.](\d+)', r'\1,\2', text)
-        text = re.sub('([a-zа-я][.]){2,}', remove_dots_from_shortenings, text)
-        text = re.sub('(?<=[^а-я])(' + shortenings + ')[.]', '\1 ', text)
-        re.sub(r'(\d+),(\d+)', r'\1.\2', text)
-
-        text = re.sub(u'[^a-zа-я0-9.]', ' ', text)
+        text = text.lower()
+        # text = text.replace(u'ё', u'е')
+        # text = text.replace(u'²', '2')
+        # text = re.sub('(\d+)[.](\d+)', r'\1,\2', text)
+        # text = re.sub('([a-zа-я][.]){2,}', remove_dots_from_shortenings, text)
+        # text = re.sub('(?<=[^а-я])(' + shortenings + ')[.]', '\1 ', text)
+        # re.sub(r'(\d+),(\d+)', r'\1.\2', text)
+        #
+        # text = re.sub(u'[^a-zа-я0-9.]', ' ', text)
         text = re.sub('\s+', ' ', text)
         return text.strip()
 
@@ -277,7 +278,7 @@ def feature_selective():
         "param_combined":'category',
 
         "price": np.float64,
-        "item_seq_number": np.float32,
+        "item_seq_number": np.float64,
 
 
         "weekday": np.float16,

@@ -46,7 +46,7 @@ def tokenize_sentences(sentences):
         for sentence in tqdm(sentences):
             seq = []
             for word in sentence:
-                if frequency[word]<= 3 :
+                if frequency[word]<= 4 :
                     continue
                 if word not in words_dict:
                     words_dict[word] = len(words_dict) + 1
@@ -68,23 +68,39 @@ def get_embedding_matrix(word_index):
     embedding_matrix = np.zeros((num_words,300))
 
     print('num of word: ',num_words)
-    ft_model = load_model('wiki.en.bin')
+    ft_model = load_model('./dataset/cc.ru.300.bin')
     for word, i in tqdm(word_index.items()):
         embedding_matrix[i] = ft_model.get_word_vector(word).astype('float32')
     del ft_model
 
     return embedding_matrix
+def clean(sentences):
+    from tool import norm_text
+    num_cpu = mlp.cpu_count()
+    pool = mlp.Pool(num_cpu)
+    num_task = 1 + len(sentences) // num_cpu
+    results = []
+
+    for i in range(num_cpu):
+        result = pool.apply_async(norm_text,args=(sentences[i*num_task:(i+1)*num_task],))
+        results.append(result)
+    pool.close()
+    pool.join()
+
+    clean_sent = []
+    for result in tqdm(results):
+        clean_sent += result.get()
+    return clean_sent
 
 def pocess_text(data):
     from keras.preprocessing.sequence import pad_sequences
     from config import desc_len,title_len
-
-    desc,word_idx = tokenize_sentences(data['description'].values)
+    desc,word_idx = tokenize_sentences(clean(data['description'].fillna('unk').values))
     desc = pad_sequences(desc,maxlen=desc_len,truncating='post')
     desc = np.array(desc)
     desc_embed = get_embedding_matrix(word_idx)
 
-    title,word_idx = tokenize_sentences(data['title'].values)
+    title,word_idx = tokenize_sentences(clean(data['title'].fillna('unk').values))
     title = pad_sequences(title, maxlen=title_len, truncating='post')
     title = np.array(title)
     title_embed = get_embedding_matrix(word_idx)
