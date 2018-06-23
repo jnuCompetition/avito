@@ -65,6 +65,24 @@ num leaves      lr        bin       bag frac       feat frac
 [350]   valid_0's rmse: 0.218399
 [400]   valid_0's rmse: 0.218144
 
+[50]    valid_0's rmse: 0.231379
+[100]   valid_0's rmse: 0.223362
+[150]   valid_0's rmse: 0.220601
+[200]   valid_0's rmse: 0.21928
+[250]   valid_0's rmse: 0.218492
+[300]   valid_0's rmse: 0.217937
+[350]   valid_0's rmse: 0.21748
+
+
+[50]    valid_0's rmse: 0.231379
+[100]   valid_0's rmse: 0.223362
+[150]   valid_0's rmse: 0.220601
+[200]   valid_0's rmse: 0.21928
+[250]   valid_0's rmse: 0.218492
+[300]   valid_0's rmse: 0.217937
+[350]   valid_0's rmse: 0.21748
+[400]   valid_0's rmse: 0.217101
+
 """
 
 

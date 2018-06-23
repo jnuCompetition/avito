@@ -8,6 +8,7 @@ from itertools import combinations,product
 from tool import co_prob,condition_prob,condition_stat,num2bin
 from process_worker import prob_feature_worker,tfidf_worker,conti_stat_feature_worker
 from sklearn.linear_model import Ridge
+from keras.callbacks import EarlyStopping
 
 """
 tem_id                  - Ad id.
@@ -83,16 +84,16 @@ def get_geo_feature(df):
     df.drop(['city_region'],axis=1,inplace=True)
     return df
 
-def tfidf_feat(train,test,features,n_components,alg='pca',sparse=False):
+def tfidf_feat(train,test,features,n_components,analyzer,alg='pca',sparse=False,gram=3):
 
     print(features,n_components)
 
 
     pool = mlp.Pool(len(features))
     results = []
-    for feat,k in zip(features,n_components):
+    for feat,k,anal in zip(features,n_components,analyzer):
         result = pool.apply_async(tfidf_worker,
-                                  args=(feat,k,train[feat],test[feat],alg,sparse))
+                                  args=(feat,k,train[feat],test[feat],alg,sparse,anal,gram))
         results.append((feat,k,result))
         # tfidf_worker(feat,k,train[feat],test[feat],alg)
     pool.close()
@@ -535,34 +536,120 @@ def oof_feature(train,test,alpha):
 
     return train,test
 
-def img_feat():
+def generator(imgs,batchsize):
+    from keras.preprocessing import image
+    from keras.applications.vgg16 import preprocess_input
+
+    iters = 1+len(imgs)//batchsize
+    for i in tqdm(range(iters)):
+        data = []
+        for f in imgs[i*(batchsize):(i+1)*batchsize]:
+            im = image.img_to_array(image.load_img(f,target_size=(256,256)))
+            data.append(preprocess_input(im))
+
+        yield {'input_1':np.array(data)}
+
+def img_feat(train,test):
+    import tensorflow as tf
+    import keras.backend.tensorflow_backend as KTF
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True  # 不全部占满显存, 按需分配
+    session = tf.Session(config=config)
+    KTF.set_session(session)
     from keras.applications.vgg16 import VGG16
     from keras.models import Model
+    from keras.layers import GlobalAveragePooling2D, GlobalMaxPool2D, concatenate
+    from sklearn.decomposition import PCA
 
-    x = VGG16(weights='imagenet',include_top=False).output
-    x = GlobalAveragePooling2D()(x)
-    # let's add a fully-connected layer
-    x = Dense(1024, activation='relu')(x)
-    # and a logistic layer -- let's say we have 200 classes
-    predictions = Dense(200, activation='softmax')(x)
-    model = Model(inputs=model.input, outputs=model.output)
+    out = VGG16(weights='imagenet',include_top=False)
+    x = GlobalAveragePooling2D()(out.output)
+    y = GlobalMaxPool2D()(out.output)
+    z = concatenate([x,y])
+    model = Model(inputs=out.input,outputs=z)
 
+    train['image'].fillna('unk',inplace=True)
+    train['image'] = './dataset/train_img/'+train['image']+'.jpg'
+    test['image'].fillna('unk', inplace=True)
+    test['image'] = './dataset/test_img/'+test['image']+'.jpg'
+    train = train.append(test)
+    imgs = train['image'].values
+    del train,test
+    print(len(imgs))
+    print('predict')
+    batchsize = 128
+    steps = (len(imgs)+batchsize-1)//batchsize
+    results = model.predict_generator(generator(imgs,batchsize=batchsize),steps=steps,verbose=1,use_multiprocessing=True)
+
+    np.save('./dataset/img_feat.npy',results)
+
+    pca = PCA(n_components=512)
+
+    results = pca.fit_transform(results)
+    np.save('./dataset/img_feat_demeni.npy', results)
+    total_ratio = []
+    ratio = 0
+    for i in pca.explained_variance_ratio_:
+        ratio += i
+        total_ratio.append(ratio)
+    print(total_ratio)
+
+
+
+def get_word_vec(train,test,usecol):
+
+    train = train[usecol]
+    train_active = pd.read_csv('./dataset/train_active.csv', usecols=[usecol])
+    test= test[usecol]
+    test_active = pd.read_csv('./dataset/test_active.csv', usecols=[usecol])
+    all_samples = pd.concat([
+        train,
+        train_active,
+        test,
+        test_active
+    ]).fillna('unk').reset_index(drop=True)
+    sentences = all_samples[usecol].values
+    del train,train_active,test,test_active,all_samples
+    gc.collect()
+
+    from text_embedding import tokenize_word
+    from gensim.models import Word2Vec
+    from text_embedding import clean
+
+    print('clean ')
+    sentences = clean(sentences)
+    num_seq = len(sentences)//4 + 1
+    for i in range(4):
+        sentences[i*num_seq:(i+1)*num_seq] = tokenize_word(sentences[i*num_seq:(i+1)*num_seq])
+
+    print('train')
+    model = Word2Vec(size=300,workers=32,iter=3,min_count=5)
+    model.build_vocab(sentences)
+    model.train(sentences,total_examples=model.corpus_count, epochs=3)  #
+    del sentences
+    print('save')
+    model.save('./dataset/2'+usecol+'.model')
+    del model
+    print('success')
+    gc.collect()
 
 def pipeline():
 
 
     # train = pd.read_csv("./dataset/train.csv",parse_dates=["activation_date"])
     # test = pd.read_csv("./dataset/test.csv",parse_dates=["activation_date"])
-    train = pd.read_csv("./dataset/train.csv",usecols=['description','title'])
-    test = pd.read_csv("./dataset/test.csv",usecols=['description','title'])
+    train = pd.read_csv("./dataset/train.csv",usecols=["description",'title'])
+    test = pd.read_csv("./dataset/test.csv",usecols=["description",'title'])
     # train,test = baseFeature(train),baseFeature(test)
     # train,test = get_geo_feature(train),get_geo_feature(test)
 
     print('tfidf')
-    # tfidf_feat(train, test, ['description','title'],[1000,500],alg='ica')
-    tfidf_feat(train,test,['description','title'],[1000,500],sparse=True)
+    # tfidf_feat(train, test, ['param_combined'],[1000,500],alg='ica')
+    tfidf_feat(train,test,["description",'title'],[800,400],sparse=True,analyzer=['word','word'],gram=3)
 
+    # get_word_vec(train,test,'description')
+    # get_word_vec(train,test,'title')
 
+    # img_feat(train,test)
     # train, test = agg_time_feat(train, test)
 
     # train,test = num_to_bin_feature(train,test)

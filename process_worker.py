@@ -89,7 +89,7 @@ def conti_stat_feature_worker(usecols,features):
     return train[cols],test[cols]
 
 
-def tfidf_worker(feat,k,train_text,test_text,alg='pca',sparse=False):
+def tfidf_worker(feat,k,train_text,test_text,alg='pca',sparse=False,analyzer='word',gram = 3):
     from sklearn.decomposition import KernelPCA, PCA, TruncatedSVD,FastICA
     from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
     from nltk.corpus import stopwords
@@ -130,44 +130,62 @@ def tfidf_worker(feat,k,train_text,test_text,alg='pca',sparse=False):
         print(feat)
         return de_matrix
 
-    text = train_text.fillna('_unk_').values.tolist() + \
-           test_text.fillna('_unk_').values.tolist()
+    text = train_text.fillna('unk').values.tolist() + \
+           test_text.fillna('unk').values.tolist()
     text = norm_text(text)
 
-    if feat == 'title':
-        model = CountVectorizer(ngram_range=(1, 2),analyzer=ToktokTokenizer().tokenize,max_features=8000,
+
+    if analyzer=='word':
+        print('word')
+        analyzer = ToktokTokenizer().tokenize
+        ngram = (1,gram)
+        max_feat = 10000
+        max_df = 0.4
+    else:
+        print('char')
+        analyzer = 'char'
+        ngram = (1,gram)
+        max_feat = 5000
+        max_df = 0.5
+
+    if feat in ['title','param_combined']:
+        print('get ',feat)
+        model = CountVectorizer(ngram_range=ngram,analyzer=analyzer,max_features=8000,
                                 stop_words = set(stopwords.words('russian')),)
     else:
-        model = TfidfVectorizer(max_features=15000,strip_accents='unicode', analyzer=ToktokTokenizer().tokenize,
-                          min_df=15,stop_words=set(stopwords.words('russian')),max_df = 0.4,
-                          ngram_range=(1,2),smooth_idf=False, sublinear_tf=True)
+        model = TfidfVectorizer(max_features=max_feat,strip_accents='unicode', analyzer=analyzer,
+                          min_df=25,stop_words=set(stopwords.words('russian')),max_df = max_df,
+                          ngram_range=ngram,smooth_idf=False, sublinear_tf=True)
     tfidf_feat = model.fit_transform(text)
     tfidf_feat = tfidf_feat.asfptype()
+    if isinstance(analyzer,str) == False:
+        analyzer = 'word'
     if sparse:
         from scipy.sparse import save_npz
-        save_npz('./dataset/sparse'+feat+'.npz',tfidf_feat)
+        save_npz('./dataset/sparse'+str(gram)+feat+analyzer+'.npz',tfidf_feat)
     else:
         # 获取pca后的np
         de_matrix = pca_compression(tfidf_feat, n_components=k)
-        np.save('./dataset/'+alg+feat+'_word.npy',de_matrix)
+        np.save('./dataset/'+alg+feat+'_'+analyzer+'.npy',de_matrix)
 
 
 
 def img_info_worker(img_files,path):
     from img_tool import  perform_color_analysis,average_pixel_width,get_average_color,get_dominant_color,get_blurrness_score
-
+    import cv2
     img_samples = []
     for i,img_f in tqdm(enumerate(img_files)):
 
         img_feat = []
         if isinstance(img_f,str):
             img_path = path+img_f+'.jpg'
-            light_percent, dark_percent = perform_color_analysis(img_path,'all')
-            img_feat += [light_percent,dark_percent]
-            img_feat.append(get_average_color(img_path))
-            img_feat.append(get_blurrness_score(img_path))
-            img_feat.append(get_dominant_color(img_path))
-            img_feat.append(average_pixel_width(img_path))
+            img = cv2.imread(img_path)
+            # light_percent, dark_percent = perform_color_analysis(img,'all')
+            # img_feat += [light_percent,dark_percent]
+            # img_feat.append(get_average_color(img))
+            img_feat.append(get_blurrness_score(img))
+            img_feat.append(get_dominant_color(img))
+            img_feat.append(average_pixel_width(img))
 
         img_samples.append(img_feat)
 

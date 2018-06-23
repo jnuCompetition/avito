@@ -276,15 +276,16 @@ def feature_selective():
         "image": 'category',
         "image_top_1": 'category',
         "param_combined":'category',
+        "weekday": 'category',
+
+        "day": 'category',
+        "week": 'category',
 
         "price": np.float64,
         "item_seq_number": np.float64,
-
-
-        "weekday": np.float16,
         "month": np.float16,
-        "day": np.float16,
-        "week": np.float16,
+
+
         "description_len": np.float16,
         "title_len": np.float16,
         "param_combined_len": np.float16,
@@ -353,7 +354,7 @@ def feature_selective():
 
     feat_imp = pd.read_csv('feat.csv')
     feat = feat_imp['name'].values.tolist()
-    feat = feat[-200:]
+    feat = feat[-250:]
     #
     usecols = feat
 

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mlp
 from nltk.tokenize.toktok import ToktokTokenizer
-
+import gc
 def tokenize_worker(sentences):
     tknzr = ToktokTokenizer()
     sentences = [tknzr.tokenize(seq) for seq in tqdm(sentences)]
@@ -12,9 +12,10 @@ def tokenize_worker(sentences):
 def tokenize_word(sentences):
     " 多进程分词"
     results = []
-    pool = mlp.Pool(mlp.cpu_count())
-    aver_t = int(len(sentences)/ mlp.cpu_count()) + 1
-    for i in range(mlp.cpu_count()):
+    num_cpu = mlp.cpu_count()
+    pool = mlp.Pool(num_cpu)
+    aver_t = len(sentences)//num_cpu + 1
+    for i in range(num_cpu):
         result = pool.apply_async(tokenize_worker,
                                   args=(sentences[i * aver_t:(i + 1) * aver_t],))
         results.append(result)
@@ -46,7 +47,7 @@ def tokenize_sentences(sentences):
         for sentence in tqdm(sentences):
             seq = []
             for word in sentence:
-                if frequency[word]<= 4 :
+                if frequency[word]<= 5 :
                     continue
                 if word not in words_dict:
                     words_dict[word] = len(words_dict) + 1
@@ -60,23 +61,36 @@ def tokenize_sentences(sentences):
     return step_to_seq(sentences,freq)
 
 
-def get_embedding_matrix(word_index):
+def get_embedding_matrix(word_index,feat=None):
     print('get embedding matrix')
     from fastText import load_model
+    from gensim.models import Word2Vec
+
     num_words = len(word_index) + 1
     # 停止符用0
     embedding_matrix = np.zeros((num_words,300))
 
     print('num of word: ',num_words)
-    ft_model = load_model('./dataset/cc.ru.300.bin')
-    for word, i in tqdm(word_index.items()):
-        embedding_matrix[i] = ft_model.get_word_vector(word).astype('float32')
+    if feat is None:
+        ft_model = load_model('./dataset/cc.ru.300.bin')
+        for word, i in tqdm(word_index.items()):
+            embedding_matrix[i] = ft_model.get_word_vector(word).astype('float32')
+    else:
+        error = 0
+        ft_model = Word2Vec.load('./dataset/2'+feat+'.model')
+        for word, i in tqdm(word_index.items()):
+            try:
+                embedding_matrix[i] = ft_model[word].astype('float32')
+            except KeyError as e:
+                error +=1
+        print('error',error)
     del ft_model
 
     return embedding_matrix
+
 def clean(sentences):
     from tool import norm_text
-    num_cpu = mlp.cpu_count()
+    num_cpu = mlp.cpu_count()//2
     pool = mlp.Pool(num_cpu)
     num_task = 1 + len(sentences) // num_cpu
     results = []

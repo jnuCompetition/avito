@@ -10,7 +10,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth=True   #不全部占满显存, 按需分配
 session = tf.Session(config=config)
 KTF.set_session(session)
-
+""
 from keras.layers import Embedding,Input,concatenate,Dense,Flatten,CuDNNGRU,Bidirectional
 from keras.layers import Conv2D,GlobalMaxPooling1D,GlobalAveragePooling1D,Activation
 from keras.layers import MaxPool2D,GlobalAveragePooling2D,BatchNormalization,Dropout

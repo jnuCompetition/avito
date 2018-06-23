@@ -66,7 +66,7 @@ def average_pixel_width(img):
     return apw*100
 
 def get_dominant_color(img):
-    img = cv2.imread(img)
+
     arr = np.float32(img)
     pixels = arr.reshape((-1, 3))
 
@@ -82,7 +82,7 @@ def get_dominant_color(img):
     return dominant_color
 
 def get_average_color(img):
-    img = cv2.imread(img)
+
     average_color = [img[:, :, i].mean() for i in range(img.shape[-1])]
     return average_color
 
@@ -95,7 +95,7 @@ def getDimensions(filename):
     return img_size
 
 def get_blurrness_score(img):
-    img = cv2.imread(img)
+
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     fm = cv2.Laplacian(img, cv2.CV_64F).var()
     return fm
